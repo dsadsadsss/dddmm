@@ -8,7 +8,7 @@ if [ ! -s /etc/supervisor/conf.d/damon.conf ]; then
   GRPC_PROXY_PORT=443
   GRPC_PORT=5555
   WEB_PORT=8080
-  PRO_PORT=${PRO_PORT:-'80'}
+  PRO_PORT=${PRO_PORT:-'8008'}
   CADDY_HTTP_PORT=2052
   WORK_DIR=/dashboard
   IS_UPDATE=${IS_UPDATE:-'no'}
@@ -19,8 +19,7 @@ if [ ! -s /etc/supervisor/conf.d/damon.conf ]; then
   info() { echo -e "\033[32m\033[01m$*\033[0m"; }   # 绿色
   hint() { echo -e "\033[33m\033[01m$*\033[0m"; }   # 黄色
 
-  # 如参数不齐全，容器退出，另外处理某些环境变量填错后的处理
-  [[ -z "$GH_USER" || -z "$GH_CLIENTID" || -z "$GH_CLIENTSECRET" || -z "$ARGO_AUTH" || -z "$ARGO_DOMAIN" ]] && error " There are variables that are not set. "
+  # 参数预处理
   [[ "$ARGO_AUTH" =~ TunnelSecret ]] && grep -qv '"' <<< "$ARGO_AUTH" && ARGO_AUTH=$(sed 's@{@{"@g;s@[,:]@"\0"@g;s@}@"}@g' <<< "$ARGO_AUTH")  # Json 时，没有了"的处理
   [[ "$ARGO_AUTH" =~ ey[A-Z0-9a-z=]{120,250}$ ]] && ARGO_AUTH=$(awk '{print $NF}' <<< "$ARGO_AUTH") # Token 复制全部，只取最后的 ey 开始的
   [ -n "$GH_REPO" ] && grep -q '/' <<< "$GH_REPO" && GH_REPO=$(awk -F '/' '{print $NF}' <<< "$GH_REPO")  # 填了项目全路径的处理
