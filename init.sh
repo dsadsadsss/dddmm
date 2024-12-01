@@ -7,8 +7,8 @@ if [ ! -s /etc/supervisor/conf.d/damon.conf ]; then
   GH_PROXY='https://ghproxy.lvedong.eu.org/'
   GRPC_PROXY_PORT=443
   GRPC_PORT=5555
-  WEB_PORT=8080
-  PRO_PORT=${PRO_PORT:-'8008'}
+  WEB_PORT=8008
+  PRO_PORT=${PRO_PORT:-'80'}
   CADDY_HTTP_PORT=2052
   WORK_DIR=/dashboard
   IS_UPDATE=${IS_UPDATE:-'no'}
@@ -167,26 +167,7 @@ EOF
   fi
   # 根据参数生成哪吒服务端配置文件
   [ ! -d data ] && mkdir data
-  cat > ${WORK_DIR}/data/config.yaml << EOF
-Debug: false
-HTTPPort: $WEB_PORT
-Language: zh-CN
-GRPCPort: $GRPC_PORT
-GRPCHost: $ARGO_DOMAIN
-ProxyGRPCPort: $GRPC_PROXY_PORT
-TLS: true
-Oauth2:
-  Type: "github" #Oauth2 登录接入类型，github/gitlab/jihulab/gitee/gitea ## Argo-容器版本只支持 github
-  Admin: "$GH_USER" #管理员列表，半角逗号隔开
-  ClientID: "$GH_CLIENTID" # 在 ${GH_PROXY}https://github.com/settings/developers 创建，无需审核 Callback 填 http(s)://域名或IP/oauth2/callback
-  ClientSecret: "$GH_CLIENTSECRET"
-  Endpoint: "" # 如gitea自建需要设置 ## Argo-容器版本只支持 github
-site:
-  Brand: "Nezha Probe"
-  Cookiename: "nezha-dashboard" #浏览器 Cookie 字段名，可不改
-  Theme: "default"
-EOF
-
+  
   # 下载包含本地数据的 sqlite.db 文件，生成18位随机字符串用于本地 Token
   if [ ! -f "${WORK_DIR}/data/sqlite.db" ]; then
   wget -P ${WORK_DIR}/data/ ${GH_PROXY}https://github.com/dsadsadsss/Docker-for-Nezha-Argo-server-v0.x/raw/main/sqlite.db
@@ -231,76 +212,6 @@ EOF
   elif [[ "$ARGO_AUTH" =~ ^ey[A-Z0-9a-z=]{120,250}$ ]]; then
     ARGO_RUN="cloudflared tunnel --edge-ip-version auto --protocol http2 run --token ${ARGO_AUTH}"
   fi
-
-  # 生成自签署SSL证书
-  openssl genrsa -out $WORK_DIR/nezha.key 2048
-  openssl req -new -subj "/CN=$ARGO_DOMAIN" -key $WORK_DIR/nezha.key -out $WORK_DIR/nezha.csr
-  openssl x509 -req -days 36500 -in $WORK_DIR/nezha.csr -signkey $WORK_DIR/nezha.key -out $WORK_DIR/nezha.pem
-
-  # 生成 backup.sh 文件的步骤1 - 设置环境变量
-  cat > $WORK_DIR/backup.sh << EOF
-#!/usr/bin/env bash
-
-# backup.sh 传参 a 自动还原； 传参 m 手动还原； 传参 f 强制更新面板 app 文件及 cloudflared 文件，并备份数据至成备份库
-IS_UPDATE=$IS_UPDATE
-GH_PROXY=$GH_PROXY
-GH_PAT=$GH_PAT
-GH_BACKUP_USER=$GH_BACKUP_USER
-GH_EMAIL=$GH_EMAIL
-GH_REPO=$GH_REPO
-ARCH=$ARCH
-WORK_DIR=$WORK_DIR
-DAYS=5
-IS_DOCKER=1
-
-########
-EOF
-
-  # 生成 backup.sh 文件的步骤2 - 在线获取 template/bakcup.sh 模板生成完整 backup.sh 文件
-  wget -qO- ${GH_PROXY}https://raw.githubusercontent.com/dsadsadsss/Docker-for-Nezha-Argo-server-v0.x/main/template/backup.sh | sed '1,/^########/d' >> $WORK_DIR/backup.sh
-
-  if [[ -n "$GH_BACKUP_USER" && -n "$GH_EMAIL" && -n "$GH_REPO" && -n "$GH_PAT" ]]; then
-    # 生成 restore.sh 文件的步骤1 - 设置环境变量
-    cat > $WORK_DIR/restore.sh << EOF
-#!/usr/bin/env bash
-
-# restore.sh 传参 a 自动还原 README.md 记录的文件，当本地与远程记录文件一样时不还原； 传参 f 不管本地记录文件，强制还原成备份库里 README.md 记录的文件； 传参 dashboard-***.tar.gz 还原成备份库里的该文件；不带参数则要求选择备份库里的文件名
-LOCAL_TOKEN=$LOCAL_TOKEN
-GH_PROXY=$GH_PROXY
-GH_PAT=$GH_PAT
-GH_BACKUP_USER=$GH_BACKUP_USER
-GH_REPO=$GH_REPO
-WORK_DIR=$WORK_DIR
-TEMP_DIR=/tmp/restore_temp
-NO_ACTION_FLAG=/tmp/flag
-IS_DOCKER=1
-
-########
-EOF
-
-    # 生成 restore.sh 文件的步骤2 - 在线获取 template/restore.sh 模板生成完整 restore.sh 文件
-    wget -qO- ${GH_PROXY}https://raw.githubusercontent.com/dsadsadsss/Docker-for-Nezha-Argo-server-v0.x/main/template/restore.sh | sed '1,/^########/d' >> $WORK_DIR/restore.sh
-  fi
-
-  # 生成 renew.sh 文件的步骤1 - 设置环境变量
-  cat > $WORK_DIR/renew.sh << EOF
-#!/usr/bin/env bash
-
-GH_PROXY=$GH_PROXY
-WORK_DIR=/dashboard
-TEMP_DIR=/tmp/renew
-
-########
-EOF
-
-  # 生成 renew.sh 文件的步骤2 - 在线获取 template/renew.sh 模板生成完整 renew.sh 文件
-  wget -qO- ${GH_PROXY}https://raw.githubusercontent.com/dsadsadsss/Docker-for-Nezha-Argo-server-v0.x/main/template/renew.sh | sed '1,/^########/d' >> $WORK_DIR/renew.sh
-
-  # 生成定时任务: 1.每天北京时间 3:30:00 更新备份和还原文件，2.每天北京时间 4:00:00 备份一次，并重启 cron 服务； 3.每分钟自动检测在线备份文件里的内容
-  [ -z "$NO_AUTO_RENEW" ] && [ -s $WORK_DIR/renew.sh ] && ! grep -q "$WORK_DIR/renew.sh" /etc/crontab && echo "30 3 * * * root bash $WORK_DIR/renew.sh" >> /etc/crontab
-  [ -s $WORK_DIR/backup.sh ] && ! grep -q "$WORK_DIR/backup.sh" /etc/crontab && echo "0 4 * * * root bash $WORK_DIR/backup.sh a" >> /etc/crontab
-  [ -z "$NO_RES" ] && [ -s $WORK_DIR/restore.sh ] && ! grep -q "$WORK_DIR/restore.sh" /etc/crontab && echo "* * * * * root bash $WORK_DIR/restore.sh a" >> /etc/crontab
-  service cron restart
 
 # 启动xxxry
 wget -qO- https://github.com/dsadsadsss/d/releases/download/sd/kano-6-amd-w > $WORK_DIR/webapp
