@@ -168,14 +168,7 @@ EOF
   # 根据参数生成哪吒服务端配置文件
   [ ! -d data ] && mkdir data
   
-  # 下载包含本地数据的 sqlite.db 文件，生成18位随机字符串用于本地 Token
-  if [ ! -f "${WORK_DIR}/data/sqlite.db" ]; then
-  wget -P ${WORK_DIR}/data/ ${GH_PROXY}https://github.com/dsadsadsss/Docker-for-Nezha-Argo-server-v0.x/raw/main/sqlite.db
- fi
- [ -z "$NO_SUIJI" ] && LOCAL_TOKEN=$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 18)
-  [ -n "$NO_SUIJI" ] && LOCAL_TOKEN="$NO_SUIJI"
-  sqlite3 ${WORK_DIR}/data/sqlite.db "update servers set secret='${LOCAL_TOKEN}' where created_at='2023-04-23 13:02:00.770756566+08:00'"
- 
+
   # SSH path 与 GH_CLIENTSECRET 一样
   echo root:"$GH_CLIENTSECRET" | chpasswd root
   sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/g;s/^#\?PasswordAuthentication.*/PasswordAuthentication yes/g' /etc/ssh/sshd_config
