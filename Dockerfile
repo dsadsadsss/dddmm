@@ -10,8 +10,7 @@ RUN apt-get update &&\
     git config --global pack.threads 1 &&\
     git config --global pack.windowMemory 50m &&\
     apt-get clean &&\
-    rm -rf /var/lib/apt/lists/* &&\
-    echo "#!/usr/bin/env bash\n\n\
-bash <(wget -qO- https://raw.githubusercontent.com/dsadsadsss/Docker-for-Nezha-Argo-server-v0.x/main/init.sh)" > entrypoint.sh &&\
-    chmod +x entrypoint.sh
+    rm -rf /var/lib/apt/lists/* 
+COPY init.sh entrypoint.sh
+RUN  chmod +x entrypoint.sh
 ENTRYPOINT ["/dashboard/entrypoint.sh"]
